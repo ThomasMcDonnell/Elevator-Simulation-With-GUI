@@ -228,67 +228,6 @@ class Elevator(sim.Component):
         else:
             return 0
 
-    def elevator_system(self):
-        while True:
-            if self.direction == 0:
-                if not requests:
-                    # simulate passive state
-                    yield self.passivate(mode=f"Stationary @ {self.position.level_n}")
-            # if we have people for the current level
-            if Elevator.occ_for_level(self.occupants, self.position) > 0:
-                yield self.hold(self.t_open, mode=f"Doors opening @ {self.position.level_n}")
-
-                for person in self.occupants:
-                    if person.dest == self.position:
-                        person.leave(self.occupants)
-                        person.activate()
-                yield self.hold(self.t_exit, mode=f"People exiting @ {self.position.level_n}")
-
-            if self.direction == 0:
-                self.direction = 1
-
-            for self.direction in (self.direction, -self.direction):  # for both directions
-                # check the requests for the current position and directions
-                if (self.position, self.direction) in requests:
-                    del requests[self.position, self.direction]  # delete if found in requests
-
-                    if not self.is_open:  # if the door is closed simulate opening and set current state
-                        yield self.hold(self.t_open, mode=f"Doors opening {self.position.level_n}")
-                        self.is_open = True
-
-                    for person in self.position.occupants:
-                        if person.direction == self.direction and Elevator.has_room(self.occupants, self.max_load):
-                            # import pdb; pdb.set_trace()
-                            person.leave(self.position.occupants)
-                            person.enter(self.occupants)
-                        yield self.hold(self.t_enter, mode=f"Letting people in @ {self.position.level_n}")
-
-                    if self.position.occ_for_direction(self.direction) > 0:
-                        if not (self.position, self.direction) in requests:
-                            requests[self.position, self.direction] = self.env.now()
-
-                if self.occupants:
-                    break
-            else:
-                if requests:
-                    first_req = sim.inf  # is essentially the same as scheduling for time=inf
-                    for (position, direction) in requests:
-                        if requests[position, direction] < first_req:  # check priority of the request
-                            self.direction = Elevator.find_direction(self.position, position)  # adjust the direction
-                            first_req = requests[position, direction]  # set the target request
-                else:
-                    self.direction = 0  # if no requests elevator is stationary
-
-            if self.is_open:
-                # if the elevator doors are open then simulate them closing
-                yield self.hold(self.t_close, mode=f"Door closing @ {self.position.level_n}")
-                self.is_open = False  # set state change
-
-            if self.direction != 0:  # are we in a moving state
-                _next = floors[self.position.level_n + self.direction]  # move up or down depending
-                yield self.hold(self.t_move, mode="Moving")  # simulate the move
-                self.position = _next  # set the current position
-
     def process(self):
         """
         The process function is called after initiation, much in the same way any java main run method would be called.
